@@ -146,3 +146,26 @@ export function helper_home_8(n) { return (n ?? 0) + 8; }
 export function helper_home_9(n) { return (n ?? 0) + 9; }
 export function helper_home_10(n) { return (n ?? 0) + 10; }
 export function helper_home_11(n) { return (n ?? 0) + 11; }
+
+
+// hook-15-日切闭窗硬闸：闭窗灯 / 批次水位 / 中文旁路 / 同票 文案（与页面、/api/日切闭窗 同源）
+export const CUT_BONE = 'hook-15-日切闭窗硬闸';
+export const CUT_LAMP = {
+  red: '闭窗灯红：日切硬闸落下，读闭窗开关与写尝试同锁同成败',
+  green: '闭窗灯绿：现行闸开窗营业',
+};
+export const CUT_WATER = '互证批次与流水同票：批次水位钉住封窗水位，闭窗后成功回刷计票外，不抬本窗';
+export const CUT_BYPASS = '中文旁路：闭窗后投递拒入现行流水，另落闭窗旁路集合，不与正式集合混';
+const CUT_FATE_BY_PAGE = {
+  home: '投递台：闭窗灯、水位、主链命运一屏直读',
+  accept: '事件队列策略：闭窗期间只入队积待投，投递口硬闸旁路，开窗后批量重试',
+  dispatch: '投递流水：成功才抬水位；闭窗后只出中文旁路卡片，不增正式流水',
+  crew: '端点名册详情：启用放行签名投递，停用入队/投递联拒；闭窗时统一受硬闸裁决',
+  receipt: '死信匣：重试耗尽入匣；闭窗时重投前置联拒、死信留匣',
+  rules: '签名规目录：日切闭窗=开 即落票封窗并物化指纹，目录与硬闸同源',
+  verify: '投递互证：批次盖闭窗票、钉批次水位，票外回刷点名为影子不混正式集合',
+  detail: '事件详情：尝试、死信与留痕同库直读，闭窗旁路另有独立集合',
+};
+export function cutPageFate(page) {
+  return CUT_FATE_BY_PAGE[page || PAGE] || CUT_WATER;
+}

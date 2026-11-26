@@ -123,3 +123,47 @@
     .登录壳 { grid-template-columns: 1fr; }
     .登录左 { padding: 28px; }
   }
+
+  /* hook-15 日切闭窗硬闸 */
+  .闸盘 { border-width: 2px; }
+  .闸盘.闭态 { border-color: var(--险); background: #fff6f5; }
+  .闸盘.开态 { border-color: var(--好); background: #f4fbf6; }
+  .闸行 { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .闭窗灯 { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; }
+  .闭窗灯 .灯 {
+    width: 16px; height: 16px; border-radius: 50%; display: inline-block;
+    background: #9aa5b1; box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
+  }
+  .闭窗灯 .灯.green { background: #2fbf71; box-shadow: 0 0 8px rgba(47,191,113,0.8); }
+  .闭窗灯 .灯.red { background: #e23b3b; box-shadow: 0 0 10px rgba(226,59,59,0.85); animation: 灯闪 1.2s infinite; }
+  @keyframes 灯闪 { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+  .灯语 { font-weight: 700; color: var(--墨); }
+  .票水 {
+    font-variant-numeric: tabular-nums; background: #eef3fa; color: var(--靛);
+    border: 1px solid var(--边); border-radius: 999px; padding: 4px 12px; font-size: 13px;
+  }
+  .骨签 { margin-left: auto; font-size: 12px; opacity: 0.72; letter-spacing: 0.04em; }
+  .闸钮 { margin-top: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .按钮.险 { background: var(--险); }
+  .按钮.好 { background: var(--好); }
+  .旁路卷 { margin-top: 14px; border-top: 1px dashed var(--边); padding-top: 10px; }
+  .旁路卷 h3 { margin: 0 0 8px; font-size: 14px; color: var(--险); }
+  .旁路单 { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .旁路单 li {
+    background: #fdf3f2; border: 1px solid #f0cfcb; border-left: 4px solid var(--险);
+    border-radius: 8px; padding: 8px 10px; font-size: 13px; line-height: 1.55;
+  }
+  .旁路单 li small { color: #7a6a63; margin-right: 6px; }
+  .命运 { font-size: 12.5px; color: #5f554c; line-height: 1.5; }
+  .命运.拒 { color: var(--险); font-weight: 600; }
+  .策略条 {
+    background: #eef3fa; border: 1px solid #cdddf2; border-left: 4px solid var(--靛);
+    border-radius: 8px; padding: 10px 12px; font-size: 13.5px; line-height: 1.6; margin-bottom: 12px;
+  }
+  .规卡 { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .规卡 .规项 { background: #fff; border: 1px solid var(--边); border-radius: 8px; padding: 10px 12px; }
+  .规卡 .规项 b { color: var(--靛); }
+  .规卡 .规项 .解 { display: block; font-size: 12.5px; opacity: 0.82; margin-top: 4px; line-height: 1.5; }
+  .详情卷 pre { white-space: pre-wrap; word-break: break-all; }
+  tr.可点 { cursor: pointer; }
+  tr.可点:hover { background: #f3efe6; }

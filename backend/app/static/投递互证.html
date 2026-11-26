@@ -28,27 +28,108 @@
       <p>Webhook 投递控制台 · 应用开发全栈 · 非工单客服</p>
     </header>
 
+<section class="卷 闸盘 开态" id="闸盘">
+  <div class="闸行">
+    <span class="闭窗灯" id="闭窗灯" aria-live="polite"><i class="灯 green" id="灯点"></i><span class="灯语" id="灯语">闭窗灯读取中…</span></span>
+    <span class="票水" id="批次水位">批次水位 —</span>
+    <span class="票水" id="封签指纹">封签指纹 —</span>
+    <span class="骨签">骨签 hook-15-日切闭窗硬闸</span>
+  </div>
+  <div class="闸钮">
+    <button class="按钮 险" type="button" id="闭窗钮">打开日切闭窗开关（落票封窗）</button>
+    <button class="按钮 好" type="button" id="开窗钮">解除闭窗（次日开窗）</button>
+    <button class="按钮 次" type="button" id="刷闸钮">刷新闭窗灯</button>
+    <p class="消息" id="闸消息" style="margin:0"></p>
+  </div>
+  <div class="旁路卷">
+    <h3>中文旁路（闭窗后回刷拒入现行流水，只在此处留命运，不混进正式集合）</h3>
+    <ul class="旁路单" id="旁路单"><li>暂无旁路。闭窗后再投，这里会逐笔写出中文命运。</li></ul>
+  </div>
+</section>
+
 <section class="卷">
-  <button class="按钮" type="button" id="跑">跑互证</button>
+  <button class="按钮" type="button" id="跑">跑互证（批次与流水同票）</button>
   <pre id="出" class="说明"></pre>
 </section>
-<section class="卷"><div class="表绕"><table><thead><tr><th>批次号</th><th>时刻</th><th>事件总数</th><th>已投递</th><th>死信</th><th>待投</th><th>对齐</th><th>说明</th></tr></thead><tbody id="表"></tbody></table></div></section>
+<section class="卷"><div class="表绕"><table><thead><tr>
+  <th>批次号</th><th>时刻</th><th>事件总数</th><th>已投递</th><th>死信</th><th>待投</th>
+  <th>对齐</th><th>闭窗票号</th><th>批次水位</th><th>票外回刷</th><th>说明</th>
+</tr></thead><tbody id="表"></tbody></table></div></section>
 
   </main>
 
 <script>
+function 命运批次(r) {
+  if (r.票外回刷数 > 0) return '票外 ' + r.票外回刷数 + ' 笔回刷被挡在票外，未抬本窗';
+  if (r.闭窗票号) return '同票 ' + r.闭窗票号 + ' · 水位 ' + r.流水水位 + '，账实同源';
+  return '开窗实时口径 · 水位 ' + (r.流水水位 ?? '—');
+}
+async function 刷闸() {
+  const st = await 投递台.getJSON('/api/日切闭窗');
+  const 盘 = document.getElementById('闸盘');
+  盘.className = '卷 闸盘 ' + (st.闭窗 ? '闭态' : '开态');
+  document.getElementById('灯点').className = '灯 ' + (st.闭窗 ? 'red' : 'green');
+  document.getElementById('灯语').textContent = st.灯语 || (st.闭窗 ? '闭窗灯红' : '闭窗灯绿');
+  document.getElementById('批次水位').textContent = '批次水位：' + (st.批次水位文案 || '');
+  document.getElementById('封签指纹').textContent = st.指纹
+    ? ('开关指纹 ' + String(st.指纹).slice(0, 16) + '…（封签' + (st.封签合规 ? '合规' : '异常·fail-closed') + '）')
+    : '尚未落封签';
+  const ul = document.getElementById('旁路单');
+  ul.innerHTML = '';
+  if (!st.旁路 || !st.旁路.length) {
+    const li = document.createElement('li');
+    li.textContent = '暂无旁路。闭窗后再投，这里会逐笔写出中文命运。';
+    ul.appendChild(li);
+  } else {
+    for (const b of st.旁路) {
+      const li = document.createElement('li');
+      li.innerHTML = '<small>' + 投递台.安全文本(b.时刻) + '</small><b>' + 投递台.安全文本(b.事件号 || '—')
+        + '</b> · ' + 投递台.安全文本(b.裁决)
+        + '<div class="命运 拒">' + 投递台.安全文本(b.中文命运) + '</div>';
+      ul.appendChild(li);
+    }
+  }
+}
 async function 刷表() {
   const rows = await 投递台.getJSON('/api/互证');
   const tb = document.getElementById('表'); tb.innerHTML='';
   for (const r of rows) {
-    tb.appendChild(投递台.行('<td>'+r.批次号+'</td><td>'+投递台.安全文本(r.时刻)+'</td><td>'+r.事件总数+'</td><td>'+r.已投递数+'</td><td>'+r.死信数+'</td><td>'+r.待投数+'</td><td>'+(r.是否对齐?'是':'否')+'</td><td>'+投递台.安全文本(r.说明)+'</td>'));
+    const tr = 投递台.行(
+      '<td>'+r.批次号+'</td>'
+      + '<td>'+投递台.安全文本(r.时刻)+'</td>'
+      + '<td>'+r.事件总数+'</td>'
+      + '<td><b>'+r.已投递数+'</b></td>'
+      + '<td>'+r.死信数+'</td>'
+      + '<td>'+r.待投数+'</td>'
+      + '<td>'+(r.是否对齐?'是':'否')+'</td>'
+      + '<td>'+投递台.安全文本(r.闭窗票号 || '—')+'</td>'
+      + '<td>'+投递台.安全文本(r.流水水位 ?? '—')+'</td>'
+      + '<td>'+(r.票外回刷数 || 0)+'</td>'
+      + '<td>'+投递台.安全文本(r.说明)+'<div class="命运">'+投递台.安全文本(命运批次(r))+'</div></td>'
+    );
+    tb.appendChild(tr);
   }
 }
+async function 切闸(body, ok语) {
+  const msg = document.getElementById('闸消息');
+  msg.style.color = 'var(--险)';
+  try {
+    const st = await 投递台.postJSON('/api/日切闭窗', body);
+    msg.style.color = 'var(--好)';
+    msg.textContent = ok语 + '：' + (st.灯语 || '');
+    await 刷闸();
+  } catch (e) { msg.textContent = e.message; }
+}
+document.getElementById('闭窗钮').onclick = () => 切闸({闭窗: true}, '硬闸已落下');
+document.getElementById('开窗钮').onclick = () => 切闸({闭窗: false}, '已开窗');
+document.getElementById('刷闸钮').onclick = () => 刷闸();
 document.getElementById('跑').onclick = async () => {
   document.getElementById('出').textContent = JSON.stringify(await 投递台.postJSON('/api/互证/跑',{}), null, 2);
-  await 刷表();
+  await 刷表(); await 刷闸();
 };
+刷闸();
 刷表();
+setInterval(刷闸, 5000);
 </script>
 
 </body>

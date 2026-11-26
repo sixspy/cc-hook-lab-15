@@ -24,9 +24,26 @@
   </header>
   <main class="主区">
     <header class="页头">
-      <h1>签名规</h1>
+      <h1>签名规目录</h1>
       <p>Webhook 投递控制台 · 应用开发全栈 · 非工单客服</p>
     </header>
+
+<section class="卷 闸盘 开态" id="闸盘">
+  <div class="闸行">
+    <span class="闭窗灯"><i class="灯 green" id="灯点"></i><span class="灯语" id="灯语">闭窗灯读取中…</span></span>
+    <span class="票水" id="批次水位">批次水位 —</span>
+  </div>
+  <div class="闸钮">
+    <button class="按钮 险" type="button" id="闭窗钮">目录项「日切闭窗」写 开（落硬闸）</button>
+    <button class="按钮 好" type="button" id="开窗钮">目录项「日切闭窗」写 关（开窗）</button>
+    <p class="消息" id="闸消息" style="margin:0"></p>
+  </div>
+</section>
+
+<section class="卷">
+  <h2 style="margin:0 0 10px;font-size:16px">规则目录（键值与库 /api/签名规 同源）</h2>
+  <div class="规卡" id="规卡"></div>
+</section>
 
 <section class="卷">
   <label>键</label><input id="键" placeholder="最大重试"/>
@@ -39,19 +56,68 @@
   </main>
 
 <script>
+const 规则解 = {
+  "最大重试": "一笔事件最多失败投递几轮；达到此值即转死信匣，死信数与互证批次同源。",
+  "签名算法": "投递尝试签名摘要算法，按 密钥版本|事件号|载荷摘要 计算 HMAC，落投递流水。",
+  "超时秒": "单次投递等待对端的超时口径；超时按失败计，进入重试退避。",
+  "产品名": "本投递控制台的产品名，仅用于页头与说明。",
+  "主链": "端到端主链：端点登记 → 事件入队 → 签名投递 → 失败重试与死信 → 投递账互证。",
+  "日切闭窗": "hook-15 硬闸开关。写「开」会落闭窗票、封水位并物化开关指纹封签；闭窗后投递回刷拒入现行流水、只走中文旁路，互证批次与流水同票。",
+};
+function 命运Of(k, v) {
+  if (k === "最大重试") return "当前值 " + v + "：失败累计到 " + v + " 即入死信，互证死信口径随之变化。";
+  if (k === "日切闭窗") return v === "开"
+    ? "当前「开」：闭窗灯红，投递写口联拒旁路，批次钉住封窗水位。"
+    : "当前「" + v + "」：闭窗灯绿，现行闸正常投递。";
+  return 规则解[k] || "签名规目录项，保存后经 /api/签名规 同库读取。";
+}
+async function 刷闸() {
+  const st = await 投递台.getJSON('/api/日切闭窗');
+  document.getElementById('闸盘').className = '卷 闸盘 ' + (st.闭窗 ? '闭态' : '开态');
+  document.getElementById('灯点').className = '灯 ' + (st.闭窗 ? 'red' : 'green');
+  document.getElementById('灯语').textContent = st.灯语;
+  document.getElementById('批次水位').textContent = '批次水位：' + st.批次水位文案;
+}
 async function 刷() {
-  document.getElementById('规').textContent = JSON.stringify(await 投递台.getJSON('/api/签名规'), null, 2);
+  const rules = await 投递台.getJSON('/api/签名规');
+  document.getElementById('规').textContent = JSON.stringify(rules, null, 2);
+  const box = document.getElementById('规卡'); box.innerHTML = '';
+  const keys = Array.from(new Set([...Object.keys(规则解), ...Object.keys(rules)]));
+  for (const k of keys) {
+    const v = rules[k] != null ? rules[k] : '（未设置）';
+    const d = document.createElement('div'); d.className = '规项';
+    d.innerHTML = '<b>' + 投递台.安全文本(k) + '</b> = <span>' + 投递台.安全文本(v) + '</span>'
+      + '<span class="解">' + 投递台.安全文本(命运Of(k, rules[k])) + '</span>';
+    box.appendChild(d);
+  }
 }
 document.getElementById('保存').onclick = async () => {
   try {
     const k = document.getElementById('键').value;
     const v = document.getElementById('值').value;
     await 投递台.postJSON('/api/签名规', {[k]: v});
+    document.getElementById('消息').style.color = 'var(--好)';
     document.getElementById('消息').textContent = '已保存';
-    await 刷();
-  } catch (e) { document.getElementById('消息').textContent = e.message; }
+    await 刷(); await 刷闸();
+  } catch (e) {
+    document.getElementById('消息').style.color = 'var(--险)';
+    document.getElementById('消息').textContent = e.message;
+  }
 };
+async function 拨闸(v) {
+  const msg = document.getElementById('闸消息');
+  try {
+    // 故意走签名规目录保存口，验证“目录项 ↔ 硬闸”同源联动
+    await 投递台.postJSON('/api/签名规', {日切闭窗: v});
+    msg.style.color = 'var(--好)';
+    msg.textContent = '签名规目录 日切闭窗=' + v + '，硬闸已联动';
+    await 刷(); await 刷闸();
+  } catch (e) { msg.style.color = 'var(--险)'; msg.textContent = e.message; }
+}
+document.getElementById('闭窗钮').onclick = () => 拨闸('开');
+document.getElementById('开窗钮').onclick = () => 拨闸('关');
 刷();
+刷闸();
 </script>
 
 </body>

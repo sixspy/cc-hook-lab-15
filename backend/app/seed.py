@@ -59,7 +59,32 @@ CREATE TABLE IF NOT EXISTS 互证批次 (
   死信数 INTEGER NOT NULL,
   待投数 INTEGER NOT NULL,
   是否对齐 INTEGER NOT NULL,
-  说明 TEXT NOT NULL
+  说明 TEXT NOT NULL,
+  闭窗票号 TEXT NOT NULL DEFAULT '',
+  流水水位 INTEGER NOT NULL DEFAULT 0,
+  票外回刷数 INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS 日切闭窗闸 (
+  闸号 INTEGER PRIMARY KEY CHECK (闸号 = 1),
+  闭窗 INTEGER NOT NULL DEFAULT 0,
+  票号 TEXT NOT NULL DEFAULT '',
+  闭窗时刻 TEXT NOT NULL DEFAULT '',
+  水位 INTEGER NOT NULL DEFAULT 0,
+  成功数 INTEGER NOT NULL DEFAULT 0,
+  指纹 TEXT NOT NULL DEFAULT '',
+  封签文件 TEXT NOT NULL DEFAULT '',
+  更新时 TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS 闭窗旁路 (
+  旁路号 TEXT PRIMARY KEY,
+  时刻 TEXT NOT NULL,
+  事件号 TEXT NOT NULL DEFAULT '',
+  端点键 TEXT NOT NULL DEFAULT '',
+  拟尝试号 TEXT NOT NULL DEFAULT '',
+  裁决 TEXT NOT NULL DEFAULT '闭窗旁路',
+  中文命运 TEXT NOT NULL,
+  票号 TEXT NOT NULL DEFAULT '',
+  水位 INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS 操作留痕 (
   编号 INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,9 +100,25 @@ def 此刻() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _补列(conn, 表: str, 列: str, 定义: str) -> None:
+    cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({表})").fetchall()}
+    if 列 not in cols:
+        conn.execute(f"ALTER TABLE {表} ADD COLUMN {列} {定义}")
+
+
 def 初始化库() -> None:
     conn = 连接()
     conn.executescript(建表)
+    # 旧库平滑补列（CREATE TABLE IF NOT EXISTS 不会给老表加列）
+    _补列(conn, "互证批次", "闭窗票号", "TEXT NOT NULL DEFAULT ''")
+    _补列(conn, "互证批次", "流水水位", "INTEGER NOT NULL DEFAULT 0")
+    _补列(conn, "互证批次", "票外回刷数", "INTEGER NOT NULL DEFAULT 0")
+    conn.execute(
+        "INSERT INTO 日切闭窗闸(闸号,闭窗,更新时) VALUES (1,0,?) "
+        "ON CONFLICT(闸号) DO NOTHING",
+        (此刻(),),
+    )
+    conn.commit()
     if conn.execute("SELECT COUNT(*) AS c FROM 用户").fetchone()["c"] == 0:
         conn.execute("INSERT INTO 用户(账号,密码哈希,角色) VALUES (?,?,?)", ("admin", "123456", "管理员"))
     if conn.execute("SELECT COUNT(*) AS c FROM 签名规").fetchone()["c"] == 0:

@@ -28,7 +28,19 @@
       <p>Webhook 投递控制台 · 应用开发全栈 · 非工单客服</p>
     </header>
 
+<section class="卷 闸盘 开态" id="闸盘">
+  <div class="闸行">
+    <span class="闭窗灯"><i class="灯 green" id="灯点"></i><span class="灯语" id="灯语">闭窗灯读取中…</span></span>
+    <span class="票水" id="批次水位">批次水位 —</span>
+  </div>
+</section>
+
 <section class="卷">
+  <div class="策略条">
+    <b>事件队列策略：</b>入队不设日切闸，闭窗期间事件照常积在「待投」；投递口由日切闭窗硬闸统一裁决——
+    闭窗灯红时只记中文旁路、不写现行流水，开窗后可在投递流水页「批量重试待投」。
+    端点停用则入队即拒。主链：入队 → 投递 → 重试/死信 → 互证同票。
+  </div>
   <label>事件类型</label><input id="事件类型" placeholder="例如 invoice.paid"/>
   <label>端点键</label><input id="端点键" placeholder="ep-billing" value="ep-billing"/>
   <label>载荷摘要</label><input id="载荷摘要" placeholder="key=value"/>
@@ -37,17 +49,38 @@
   <button class="按钮" type="button" id="入队钮">入队（待投）</button>
   <button class="按钮 次" type="button" id="夹具钮">灌夹具样例</button>
 </section>
-<section class="卷"><div class="表绕"><table><thead><tr><th>事件号</th><th>事件类型</th><th>端点键</th><th>载荷摘要</th><th>状态</th></tr></thead><tbody id="表"></tbody></table></div></section>
+<section class="卷"><div class="表绕"><table><thead><tr><th>事件号</th><th>事件类型</th><th>端点键</th><th>载荷摘要</th><th>状态</th><th>中文命运</th></tr></thead><tbody id="表"></tbody></table></div></section>
 
   </main>
 
 <script>
+function 事件命运(s, closed) {
+  if (s === '待投') return closed
+    ? '待投排队中：闭窗灯红，此刻投递会被硬闸旁路，开窗后批量重试'
+    : '待投：端点启用即可在投递流水页签名投递';
+  if (s === '投递中') return '投递中：已有失败尝试，按签名规最大重试继续退避重试';
+  if (s === '已投递') return '已投递：成功尝试已入现行流水并封进当时互证票，不可再投';
+  if (s === '死信') return '死信：重试耗尽入死信匣，可重投或作废';
+  if (s === '已作废') return '已作废：死信人工作废，留痕可查';
+  return s || '—';
+}
+let 闭窗中 = false;
+async function 刷闸() {
+  const st = await 投递台.getJSON('/api/日切闭窗');
+  闭窗中 = !!st.闭窗;
+  document.getElementById('闸盘').className = '卷 闸盘 ' + (st.闭窗 ? '闭态' : '开态');
+  document.getElementById('灯点').className = '灯 ' + (st.闭窗 ? 'red' : 'green');
+  document.getElementById('灯语').textContent = st.灯语;
+  document.getElementById('批次水位').textContent = '批次水位：' + st.批次水位文案;
+}
 async function 刷表() {
   const rows = await 投递台.getJSON('/api/事件');
   const tb = document.getElementById('表'); tb.innerHTML='';
   for (const r of rows) {
-    const tr = 投递台.行('<td>'+投递台.安全文本(r.事件号)+'</td><td>'+投递台.安全文本(r.事件类型)+'</td><td>'+投递台.安全文本(r.端点键)+'</td><td>'+投递台.安全文本(r.载荷摘要)+'</td><td></td>');
-    tr.children[4].appendChild(投递台.徽章(r.状态)); tb.appendChild(tr);
+    const tr = 投递台.行('<td>'+投递台.安全文本(r.事件号)+'</td><td>'+投递台.安全文本(r.事件类型)+'</td><td>'+投递台.安全文本(r.端点键)+'</td><td>'+投递台.安全文本(r.载荷摘要)+'</td><td></td><td class="命运"></td>');
+    tr.children[4].appendChild(投递台.徽章(r.状态));
+    tr.children[5].textContent = 事件命运(r.状态, 闭窗中);
+    tb.appendChild(tr);
   }
 }
 document.getElementById('入队钮').onclick = async () => {
@@ -59,15 +92,17 @@ document.getElementById('入队钮').onclick = async () => {
       载荷摘要: document.getElementById('载荷摘要').value,
       优先级: document.getElementById('优先级').value,
     });
+    消息.style.color = 'var(--好)';
     消息.textContent = '已入队，状态待投';
     await 刷表();
-  } catch (e) { 消息.textContent = e.message; }
+  } catch (e) { 消息.style.color = 'var(--险)'; 消息.textContent = e.message; }
 };
 document.getElementById('夹具钮').onclick = async () => {
   await 投递台.postJSON('/api/夹具入队/批量事件样例', {});
   await 刷表();
 };
-刷表();
+刷闸().then(刷表);
+setInterval(async () => { await 刷闸(); await 刷表(); }, 6000);
 </script>
 
 </body>

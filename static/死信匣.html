@@ -34,7 +34,8 @@
   <button class="按钮" type="button" id="重投钮">死信重投</button>
   <button class="按钮 次" type="button" id="作废钮">作废</button>
 </section>
-<section class="卷"><div class="表绕"><table><thead><tr><th>死信号</th><th>事件号</th><th>端点键</th><th>失败次数</th><th>末次原因</th><th>状态</th></tr></thead><tbody id="表"></tbody></table></div></section>
+<section class="卷"><div class="策略条">死信命运：失败次数耗尽签名规「最大重试」后入匣待处置；重投回待投再走投递口——闭窗灯红时重投会被前置联拒，死信留匣不做半截翻转。</div></section>
+<section class="卷"><div class="表绕"><table><thead><tr><th>死信号</th><th>事件号</th><th>端点键</th><th>失败次数</th><th>末次原因</th><th>状态</th><th>中文命运</th></tr></thead><tbody id="表"></tbody></table></div></section>
 
   </main>
 
@@ -43,8 +44,13 @@ async function 刷表() {
   const rows = await 投递台.getJSON('/api/死信');
   const tb = document.getElementById('表'); tb.innerHTML='';
   for (const r of rows) {
-    const tr = 投递台.行('<td>'+投递台.安全文本(r.死信号)+'</td><td>'+投递台.安全文本(r.事件号)+'</td><td>'+投递台.安全文本(r.端点键)+'</td><td>'+投递台.安全文本(r.失败次数)+'</td><td>'+投递台.安全文本(r.末次原因)+'</td><td></td>');
-    tr.children[5].appendChild(投递台.徽章(r.状态)); tb.appendChild(tr);
+    const 命运 = r.状态 === '待处置'
+      ? '待处置：可重投（闭窗时联拒留匣）或人工作废'
+      : (r.状态 === '已重投' ? '已重投：事件回待投，重新走签名投递' : '已作废：人工作废留痕');
+    const tr = 投递台.行('<td>'+投递台.安全文本(r.死信号)+'</td><td>'+投递台.安全文本(r.事件号)+'</td><td>'+投递台.安全文本(r.端点键)+'</td><td>'+投递台.安全文本(r.失败次数)+'</td><td>'+投递台.安全文本(r.末次原因)+'</td><td></td><td class="命运"></td>');
+    tr.children[5].appendChild(投递台.徽章(r.状态));
+    tr.children[6].textContent = 命运;
+    tb.appendChild(tr);
   }
 }
 document.getElementById('重投钮').onclick = async () => {

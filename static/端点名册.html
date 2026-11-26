@@ -36,21 +36,54 @@
   <p class="消息" id="消息"></p>
   <button class="按钮" type="button" id="登记">登记端点</button>
 </section>
-<section class="卷"><div class="表绕"><table><thead><tr><th>端点键</th><th>名称</th><th>回调URL</th><th>密钥版本</th><th>启用</th><th>操作</th></tr></thead><tbody id="表"></tbody></table></div></section>
+<section class="卷"><div class="表绕"><table><thead><tr><th>端点键</th><th>名称</th><th>回调URL</th><th>密钥版本</th><th>启用</th><th>命运</th><th>操作</th></tr></thead><tbody id="表"></tbody></table></div>
+  <p class="说明">点端点键或「详情」可打开端点名册详情，详情与 <code>/api/端点/&lt;键&gt;</code> 同库同源。</p>
+</section>
+<section class="卷 详情卷" id="详情卷" style="display:none">
+  <h2 style="margin:0 0 8px;font-size:16px" id="详情标题">端点名册详情</h2>
+  <p class="命运" id="详情命运"></p>
+  <pre id="详情" class="说明"></pre>
+  <h3 style="font-size:14px;color:var(--靛)">该端点近十笔正式流水</h3>
+  <div class="表绕"><table><thead><tr><th>尝试号</th><th>事件号</th><th>状态</th><th>响应码</th><th>说明</th><th>投递时</th></tr></thead><tbody id="详情流水"></tbody></table></div>
+</section>
 
   </main>
 
 <script>
+async function 看详情(key) {
+  const d = await 投递台.getJSON('/api/端点/' + encodeURIComponent(key));
+  document.getElementById('详情卷').style.display = '';
+  document.getElementById('详情标题').textContent = '端点名册详情 · ' + d.端点键 + '（' + d.名称 + '）';
+  document.getElementById('详情命运').textContent = d.中文命运
+    + '；累计成功 ' + d.成功数 + ' 笔、失败 ' + d.失败数 + ' 笔（均来自正式投递尝试集合）。';
+  document.getElementById('详情').textContent = JSON.stringify({
+    端点键: d.端点键, 名称: d.名称, 回调URL: d.回调URL,
+    密钥版本: d.密钥版本, 启用: d.启用, 说明: d.说明,
+  }, null, 2);
+  const tb = document.getElementById('详情流水'); tb.innerHTML = '';
+  for (const r of (d.近期投递 || [])) {
+    tb.appendChild(投递台.行('<td>'+投递台.安全文本(r.尝试号)+'</td><td>'+投递台.安全文本(r.事件号)+'</td><td></td><td>'+投递台.安全文本(r.响应码)+'</td><td>'+投递台.安全文本(r.说明)+'</td><td>'+投递台.安全文本(r.投递时)+'</td>'));
+    tb.lastChild.children[2].appendChild(投递台.徽章(r.状态));
+  }
+  document.getElementById('详情卷').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
 async function 刷表() {
   const rows = await 投递台.getJSON('/api/端点');
   const tb = document.getElementById('表'); tb.innerHTML='';
   for (const r of rows) {
-    const tr = 投递台.行('<td>'+投递台.安全文本(r.端点键)+'</td><td>'+投递台.安全文本(r.名称)+'</td><td>'+投递台.安全文本(r.回调URL)+'</td><td>'+投递台.安全文本(r.密钥版本)+'</td><td></td><td></td>');
+    const tr = 投递台.行('<td class="可点"><a href="javascript:void(0)">'+投递台.安全文本(r.端点键)+'</a></td><td>'+投递台.安全文本(r.名称)+'</td><td>'+投递台.安全文本(r.回调URL)+'</td><td>'+投递台.安全文本(r.密钥版本)+'</td><td></td><td class="命运"></td><td></td>');
     tr.children[4].appendChild(投递台.徽章(r.启用 ? '启用' : '停用'));
+    tr.children[5].textContent = r.启用 ? '启用：放行签名投递' : '停用：入队/投递联拒';
+    tr.children[0].onclick = () => 看详情(r.端点键);
     const btn = document.createElement('button'); btn.className='按钮 次'; btn.type='button';
     btn.textContent = r.启用 ? '停用' : '启用';
     btn.onclick = async () => { await 投递台.postJSON('/api/端点/启用', {端点键:r.端点键, 启用: !r.启用}); await 刷表(); };
-    tr.children[5].appendChild(btn); tb.appendChild(tr);
+    const detailBtn = document.createElement('button'); detailBtn.className='按钮 次'; detailBtn.type='button';
+    detailBtn.style.marginRight = '6px'; detailBtn.textContent = '详情';
+    detailBtn.onclick = () => 看详情(r.端点键);
+    tr.children[6].appendChild(detailBtn);
+    tr.children[6].appendChild(btn);
+    tb.appendChild(tr);
   }
 }
 document.getElementById('登记').onclick = async () => {

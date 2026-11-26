@@ -4,7 +4,7 @@ from pathlib import Path
 from flask import Flask, jsonify, redirect, request, send_from_directory
 
 from app import seed
-from app.services import 会话, 入队, 投递, 死信, 重试, 互证, 端点, 夹具, 说明, 签名目录
+from app.services import 会话, 入队, 投递, 死信, 重试, 互证, 端点, 夹具, 说明, 签名目录, 日切闭窗
 
 _STATIC = Path(__file__).resolve().parent / "static"
 
@@ -91,7 +91,7 @@ def create_app() -> Flask:
 
     @app.get("/api/投递")
     def api_投递列表():
-        return jsonify(签名目录.投递列表())
+        return jsonify(签名目录.投递列表(request.args.get("端点键") or None))
 
     @app.post("/api/投递")
     def api_投递():
@@ -129,6 +129,13 @@ def create_app() -> Flask:
     def api_端点():
         return jsonify(签名目录.端点列表())
 
+    @app.get("/api/端点/<key>")
+    def api_端点详情(key):
+        row = 签名目录.端点一条(key)
+        if not row:
+            return jsonify({"错误": "无此端点"}), 404
+        return jsonify(row)
+
     @app.post("/api/端点")
     def api_端点登记():
         body = request.get_json(force=True, silent=True) or {}
@@ -153,6 +160,75 @@ def create_app() -> Flask:
     def api_互证跑():
         return jsonify(互证.跑一次())
 
+    # —— hook-15 日切闭窗硬闸：闭窗灯 / 票水位 / 中文旁路 都从这一个同源状态口读 ——
+    @app.get("/api/日切闭窗")
+    def api_日切闭窗状态():
+        return jsonify(日切闭窗.状态())
+
+    @app.get("/api/闭窗")
+    def api_闭窗状态别名():
+        return jsonify(日切闭窗.状态())
+
+    @app.get("/api/闭窗旁路")
+    def api_闭窗旁路():
+        return jsonify({"旁路": 日切闭窗.旁路列表(50)})
+
+    def _解析闭窗意图(body) -> bool:
+        if "闭窗" in body:
+            v = body["闭窗"]
+            if isinstance(v, bool):
+                return v
+            return str(v) in ("开", "1", "true", "True", "是", "闭窗", "on")
+        if "打开" in body:  # “打开日切闭窗开关”= 落闸
+            return bool(body["打开"])
+        if "开关" in body:
+            return str(body["开关"]) in ("开", "1", "true", "True", "是", "闭窗", "on")
+        动作 = str(body.get("动作") or body.get("action") or "")
+        if 动作 in ("close", "cut", "闭窗", "落闸", "打开"):
+            return True
+        if 动作 in ("open", "开窗", "解除", "release"):
+            return False
+        return True  # POST 空体默认落闸，方便页面单按钮
+
+    @app.post("/api/日切闭窗")
+    def api_日切闭窗设置():
+        body = request.get_json(force=True, silent=True) or {}
+        try:
+            st = 日切闭窗.闭窗() if _解析闭窗意图(body) else 日切闭窗.开窗()
+            return jsonify(st)
+        except (ValueError, OSError) as e:
+            return jsonify({"错误": str(e)}), 400
+
+    @app.post("/api/闭窗")
+    def api_闭窗设置别名():
+        return api_日切闭窗设置()
+
+    @app.post("/api/日切闭窗/闭窗")
+    def api_日切闭窗落闸():
+        return jsonify(日切闭窗.闭窗())
+
+    @app.post("/api/日切闭窗/打开")
+    def api_日切闭窗打开开关():
+        return jsonify(日切闭窗.闭窗())
+
+    @app.post("/api/日切闭窗/开窗")
+    @app.post("/api/日切闭窗/解除")
+    def api_日切闭窗开窗():
+        return jsonify(日切闭窗.开窗())
+
+    @app.post("/api/闭窗/打开")
+    def api_闭窗打开别名():
+        return jsonify(日切闭窗.闭窗())
+
+    @app.post("/api/闭窗/解除")
+    def api_闭窗解除别名():
+        return jsonify(日切闭窗.开窗())
+
+    @app.get("/api/hook-15")
+    def api_hook15():
+        st = 日切闭窗.状态()
+        return jsonify({"骨签": 日切闭窗.骨签, **st})
+
     @app.get("/api/夹具")
     def api_夹具():
         return jsonify(夹具.列表())
@@ -170,13 +246,27 @@ def create_app() -> Flask:
 
     @app.get("/api/空桩")
     def api_空桩():
+        import importlib
         root = Path(__file__).resolve().parent / "modules"
         out = []
+        已挂 = []
         if root.is_dir():
             for p in sorted(root.iterdir()):
-                if p.is_dir() and (p / "__init__.py").is_file():
-                    out.append(p.name)
-        return jsonify({"空桩": out, "条数": len(out)})
+                if not (p.is_dir() and (p / "__init__.py").is_file()):
+                    continue
+                名 = p.name
+                wired = False
+                try:
+                    mod = importlib.import_module(f"app.modules.{名}")
+                    wired = bool(getattr(mod, "WIRED", False) or getattr(mod, "已挂硬实现", False))
+                except Exception:
+                    wired = False
+                if wired:
+                    已挂.append(名)
+                else:
+                    out.append(名)
+        return jsonify({"空桩": out, "条数": len(out),
+                        "已挂硬实现": 已挂, "已挂条数": len(已挂)})
 
     with app.app_context():
         seed.初始化库()

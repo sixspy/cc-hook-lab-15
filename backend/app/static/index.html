@@ -28,20 +28,47 @@
       <p>Webhook 投递控制台 · 应用开发全栈 · 非工单客服</p>
     </header>
 
+<section class="卷 闸盘 开态" id="闸盘">
+  <div class="闸行">
+    <span class="闭窗灯"><i class="灯 green" id="灯点"></i><span class="灯语" id="灯语">闭窗灯读取中…</span></span>
+    <span class="票水" id="批次水位">批次水位 —</span>
+    <a class="按钮 险" href="/投递互证.html" style="text-decoration:none">去日切闭窗硬闸</a>
+    <span class="骨签">hook-15-日切闭窗硬闸 · 三红分服务救绿</span>
+  </div>
+</section>
 <section class="卷"><div class="指标" id="指标"></div></section>
-<section class="卷"><table><thead><tr><th>事件号</th><th>事件类型</th><th>端点键</th><th>状态</th></tr></thead><tbody id="表"></tbody></table></section>
-<section class="卷"><p class="说明" id="主链"></p><button class="按钮" type="button" id="互证钮">跑投递互证</button><pre id="互证出" class="说明"></pre></section>
+<section class="卷"><table><thead><tr><th>事件号</th><th>事件类型</th><th>端点键</th><th>状态</th><th>中文命运</th></tr></thead><tbody id="表"></tbody></table></section>
+<section class="卷"><p class="说明" id="主链"></p>
+  <div class="策略条" id="命运图例">
+    命运读法：待投＝排队可投（闭窗时投递走中文旁路）；投递中＝失败待重试；已投递＝成功尝试已入现行流水并封进互证票；
+    死信＝重试耗尽入匣可重投/作废。日切闭窗灯红后，已投递计数不涨、互证批次与流水同票不抬窗。
+  </div>
+  <button class="按钮" type="button" id="互证钮">跑投递互证</button><pre id="互证出" class="说明"></pre></section>
 
   </main>
 
 <script>
+function 首页命运(s, closed) {
+  if (s === '待投') return closed ? '待投：闭窗灯红，投递将走中文旁路' : '待投：可签名投递';
+  if (s === '投递中') return '投递中：失败待重试退避';
+  if (s === '已投递') return '已投递：成功入流水并封进互证票';
+  if (s === '死信') return '死信：重试耗尽，入死信匣';
+  if (s === '已作废') return '已作废：留痕可查';
+  return s || '—';
+}
 (async () => {
   const o = await 投递台.getJSON('/api/概览');
+  const 闸 = o.闭窗闸 || {};
+  document.getElementById('闸盘').className = '卷 闸盘 ' + (闸.闭窗 ? '闭态' : '开态');
+  document.getElementById('灯点').className = '灯 ' + (闸.闭窗 ? 'red' : 'green');
+  document.getElementById('灯语').textContent = o.闭窗灯语 || 闸.灯语 || ('闭窗灯' + (o.闭窗灯 || '绿'));
+  document.getElementById('批次水位').textContent = '批次水位：' + (闸.批次水位文案 || '—');
+  const 卡键 = ['端点数','启用端点','事件总数','待投','投递中','已投递','死信','尝试数','死信匣'];
   const box = document.getElementById('指标');
-  for (const [k,v] of Object.entries(o)) {
-    if (v && typeof v === 'object') continue;
+  for (const k of 卡键) {
+    if (!(k in o)) continue;
     const d = document.createElement('div'); d.className='卡';
-    d.innerHTML = '<small>'+投递台.安全文本(k)+'</small><b>'+投递台.安全文本(v)+'</b>';
+    d.innerHTML = '<small>'+投递台.安全文本(k)+'</small><b>'+投递台.安全文本(o[k])+'</b>';
     box.appendChild(d);
   }
   const c = await 投递台.getJSON('/api/仓情');
@@ -49,8 +76,10 @@
   const rows = await 投递台.getJSON('/api/事件');
   const tb = document.getElementById('表');
   for (const r of rows.slice(0,12)) {
-    const tr = 投递台.行('<td>'+投递台.安全文本(r.事件号)+'</td><td>'+投递台.安全文本(r.事件类型)+'</td><td>'+投递台.安全文本(r.端点键)+'</td><td></td>');
-    tr.children[3].appendChild(投递台.徽章(r.状态)); tb.appendChild(tr);
+    const tr = 投递台.行('<td>'+投递台.安全文本(r.事件号)+'</td><td>'+投递台.安全文本(r.事件类型)+'</td><td>'+投递台.安全文本(r.端点键)+'</td><td></td><td class="命运"></td>');
+    tr.children[3].appendChild(投递台.徽章(r.状态));
+    tr.children[4].textContent = 首页命运(r.状态, !!闸.闭窗);
+    tb.appendChild(tr);
   }
   document.getElementById('互证钮').onclick = async () => {
     document.getElementById('互证出').textContent = JSON.stringify(await 投递台.postJSON('/api/互证/跑',{}), null, 2);

@@ -28,43 +28,89 @@
       <p>Webhook 投递控制台 · 应用开发全栈 · 非工单客服</p>
     </header>
 
+<section class="卷 闸盘 开态" id="闸盘">
+  <div class="闸行">
+    <span class="闭窗灯"><i class="灯 green" id="灯点"></i><span class="灯语" id="灯语">闭窗灯读取中…</span></span>
+    <span class="票水" id="批次水位">批次水位 —</span>
+    <a class="按钮 次" href="/投递互证.html" style="text-decoration:none">去投递互证落闸/看票</a>
+  </div>
+</section>
+
 <section class="卷">
   <label>事件号</label><input id="事件号" placeholder="EVT-..."/>
-  <label><input type="checkbox" id="强制失败"/> 强制失败（测死信）</label>
+  <label><input type="checkbox" id="强制失败" style="display:inline-block;width:auto;max-width:none"/> 强制失败（测死信）</label>
   <p class="消息" id="消息"></p>
   <button class="按钮" type="button" id="投递钮">签名投递一次</button>
   <button class="按钮 次" type="button" id="批量钮">批量重试待投</button>
+  <pre id="批量出" class="说明"></pre>
 </section>
-<section class="卷"><div class="表绕"><table><thead><tr><th>尝试号</th><th>事件号</th><th>端点键</th><th>签名摘要</th><th>状态</th><th>响应码</th></tr></thead><tbody id="表"></tbody></table></div></section>
+<section class="卷"><div class="表绕"><table><thead><tr><th>尝试号</th><th>事件号</th><th>端点键</th><th>签名摘要</th><th>状态</th><th>响应码</th><th>中文命运</th></tr></thead><tbody id="表"></tbody></table></div></section>
+
+<section class="卷">
+  <h2 style="font-size:16px;color:var(--险);margin:0 0 8px">闭窗旁路卡片（独立集合，不是正式流水，不抬已投递计数与互证窗）</h2>
+  <div class="指标" id="旁路卡"></div>
+</section>
 
   </main>
 
 <script>
+function 流水命运(r) {
+  if (r.状态 === '成功') return '签名验讫投递成功，已写入现行流水，抬高本窗批次水位';
+  if (r.状态 === '失败') return '投递失败（' + (r.响应码 || 0) + '）：按最大重试退避，耗尽自动入死信匣';
+  return r.说明 || '状态待判';
+}
+async function 刷闸() {
+  const st = await 投递台.getJSON('/api/日切闭窗');
+  document.getElementById('闸盘').className = '卷 闸盘 ' + (st.闭窗 ? '闭态' : '开态');
+  document.getElementById('灯点').className = '灯 ' + (st.闭窗 ? 'red' : 'green');
+  document.getElementById('灯语').textContent = st.灯语;
+  document.getElementById('批次水位').textContent = '批次水位：' + st.批次水位文案;
+  const box = document.getElementById('旁路卡'); box.innerHTML = '';
+  if (!st.旁路 || !st.旁路.length) {
+    const d = document.createElement('div'); d.className = '卡';
+    d.innerHTML = '<small>闭窗旁路</small><b>0</b><div class="命运">暂无旁路记录</div>';
+    box.appendChild(d); return;
+  }
+  for (const b of st.旁路.slice(0, 8)) {
+    const d = document.createElement('div'); d.className = '卡';
+    d.innerHTML = '<small>' + 投递台.安全文本(b.事件号 || '—') + ' · ' + 投递台.安全文本(b.裁决)
+      + '</small><b>' + 投递台.安全文本(b.旁路号) + '</b>'
+      + '<div class="命运 拒">' + 投递台.安全文本(b.中文命运) + '</div>';
+    box.appendChild(d);
+  }
+}
 async function 刷表() {
   const rows = await 投递台.getJSON('/api/投递');
   const tb = document.getElementById('表'); tb.innerHTML='';
   for (const r of rows) {
-    const tr = 投递台.行('<td>'+投递台.安全文本(r.尝试号)+'</td><td>'+投递台.安全文本(r.事件号)+'</td><td>'+投递台.安全文本(r.端点键)+'</td><td>'+投递台.安全文本(r.签名摘要)+'</td><td></td><td>'+投递台.安全文本(r.响应码)+'</td>');
-    tr.children[4].appendChild(投递台.徽章(r.状态)); tb.appendChild(tr);
+    const tr = 投递台.行('<td>'+投递台.安全文本(r.尝试号)+'</td><td>'+投递台.安全文本(r.事件号)+'</td><td>'+投递台.安全文本(r.端点键)+'</td><td>'+投递台.安全文本(r.签名摘要)+'</td><td></td><td>'+投递台.安全文本(r.响应码)+'</td><td class="命运"></td>');
+    tr.children[4].appendChild(投递台.徽章(r.状态));
+    tr.children[6].textContent = 流水命运(r);
+    tb.appendChild(tr);
   }
 }
 document.getElementById('投递钮').onclick = async () => {
   const 消息 = document.getElementById('消息');
+  消息.style.color = 'var(--险)';
   try {
     const rep = await 投递台.postJSON('/api/投递', {
       事件号: document.getElementById('事件号').value,
       强制失败: document.getElementById('强制失败').checked,
     });
+    消息.style.color = 'var(--好)';
     消息.textContent = JSON.stringify(rep);
-    await 刷表();
-  } catch (e) { 消息.textContent = e.message; }
+  } catch (e) { 消息.textContent = '硬闸裁决：' + e.message; }
+  await 刷表(); await 刷闸();
 };
 document.getElementById('批量钮').onclick = async () => {
   const rep = await 投递台.postJSON('/api/投递/批量重试', {});
-  document.getElementById('消息').textContent = '批量 '+rep.条数;
-  await 刷表();
+  document.getElementById('消息').textContent = '';
+  document.getElementById('批量出').textContent = rep.汇总 || ('批量 '+rep.条数);
+  await 刷表(); await 刷闸();
 };
 刷表();
+刷闸();
+setInterval(刷闸, 5000);
 </script>
 
 </body>

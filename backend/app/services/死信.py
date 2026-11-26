@@ -1,7 +1,11 @@
 from __future__ import annotations
 from app.db import 连接
 from app.services.时间 import 此刻
-from app.services import 投递
+from app.services import 投递, 日切闭窗
+
+
+class 闭窗拒绝重投(ValueError):
+    """闭窗硬闸期间，死信重投也不得把事件翻回待投后再被闸拒，故前置联拒。"""
 
 
 def 作废(事件号: str, 原因: str = "人工作废") -> dict:
@@ -24,6 +28,10 @@ def 作废(事件号: str, 原因: str = "人工作废") -> dict:
 
 
 def 重投(事件号: str) -> dict:
+    # hook-15：闭窗时前置联拒，死信仍留“待处置”，不做半截状态翻转
+    闸况 = 日切闭窗.准投()
+    if not 闸况["放行"]:
+        raise 投递.闭窗拒绝(闸况["拒绝语"] + "（死信重投口前置联拒，死信未出匣）")
     t = 此刻()
     conn = 连接()
     try:
